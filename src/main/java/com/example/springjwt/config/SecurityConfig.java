@@ -1,5 +1,7 @@
 package com.example.springjwt.config;
 
+import com.example.springjwt.jwt.JWTFilter;
+import com.example.springjwt.jwt.JWTUtil;
 import com.example.springjwt.jwt.LoginFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -18,8 +20,11 @@ public class SecurityConfig {
 
     private final AuthenticationConfiguration authenticationConfiguration;
 
-    public SecurityConfig(AuthenticationConfiguration authenticationConfiguration) {
+    private final JWTUtil jwtUtil;
+
+    public SecurityConfig(AuthenticationConfiguration authenticationConfiguration, JWTUtil jwtUtil) {
         this.authenticationConfiguration = authenticationConfiguration;
+        this.jwtUtil = jwtUtil;
     }
 
     //AuthenticationManager Bean 등록
@@ -38,7 +43,7 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
 
-        // csrf disable
+
         http
                 .csrf((auth) -> auth.disable());
 
@@ -48,23 +53,21 @@ public class SecurityConfig {
         http
                 .httpBasic((auth) -> auth.disable());
 
-        // 경로별 인가 작업
         http
                 .authorizeHttpRequests((auth) -> auth
-                        .requestMatchers("/login", "/", "join").permitAll()
-                        .requestMatchers("/admin").hasRole("ADMIN")
+                        .requestMatchers("/login", "/", "/join").permitAll()
                         .anyRequest().authenticated());
 
+        //JWTFilter 등록
         http
-                .addFilterAt(new LoginFilter(authenticationManager(authenticationConfiguration)), UsernamePasswordAuthenticationFilter.class); // 첫번째 인자는 커스텀 필터, 두번째 인자는 무엇이랑 대체할 것인지
-        // 세션 설정
+                .addFilterBefore(new JWTFilter(jwtUtil), LoginFilter.class);
+
+        http
+                .addFilterAt(new LoginFilter(authenticationManager(authenticationConfiguration), jwtUtil), UsernamePasswordAuthenticationFilter.class);
+
         http
                 .sessionManagement((session) -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS));
-
-
-
-
 
         return http.build();
     }
